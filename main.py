@@ -115,18 +115,17 @@ def generate_human_data(trait, subtrait, api_key, topic="General", num=10):
         response = requests.post(url, headers=headers, data=json.dumps(payload))
         response.raise_for_status()
 
+        # Debug raw response
+        raw_response = response.text
+        print("Raw response:", raw_response)
+
         # Handle non-JSON responses
         cleaned_content = response.text.strip()
 
         try:
-            # Ensure property names are enclosed in double quotes if necessary
-            cleaned_content = re.sub(r'(\w+):', r'"\1":', cleaned_content)
             data = json.loads(cleaned_content)
         except json.JSONDecodeError:
-            # Handle as plain text or attempt to extract valid JSON from the text
-            st.warning("Response is not valid JSON. Trying to parse as plain text.")
-            # Use regex to extract the valid JSON part if present
-            match = re.search(r"\{.*\}", cleaned_content)
+            match = re.search(r"\{.*\}", raw_response, re.DOTALL)
             if match:
                 valid_json = match.group(0)
                 data = json.loads(valid_json)
@@ -134,8 +133,9 @@ def generate_human_data(trait, subtrait, api_key, topic="General", num=10):
                 st.error("No valid JSON found in the response.")
                 return None
 
-        if "choices" not in data or not data["choices"]:
-            st.error("The API response did not contain any choices.")
+        # Validate response structure
+        if not isinstance(data, dict) or "choices" not in data or not data["choices"]:
+            st.error("Unexpected API response structure.")
             return None
 
         conversation_content = data["choices"][0].get("message", {}).get("content", None)
